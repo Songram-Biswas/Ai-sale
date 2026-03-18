@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+pymongo
+pydantic-settings
+python-dotenv
+streamlit
+requests
+pytest
+langchain-openai
+langchain-core
+langchain
+firecrawl
