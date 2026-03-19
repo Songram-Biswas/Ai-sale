@@ -108,15 +108,66 @@
 #         print(traceback.format_exc()) 
 #         raise HTTPException(status_code=500, detail=str(e))
 
+# from fastapi import FastAPI, HTTPException
+# from fastapi.middleware.cors import CORSMiddleware
+# from pydantic import BaseModel
+# from app.agents.scraper import DataCollectionAgent
+# from app.agents.processor import DataProcessor
+# from app.agents.insight_agent import InsightAgent
+# from app.database import Database
+
+# app = FastAPI()
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# scraper = DataCollectionAgent()
+# processor = DataProcessor()
+# insight_gen = InsightAgent()
+# db = Database()
+
+# class AnalyzeRequest(BaseModel):
+#     url: str
+
+# @app.post("/analyze_company")
+# async def analyze(request: AnalyzeRequest):
+#     try:
+#         raw_data = scraper.scrape(request.url)
+#         processed_data = processor.process(raw_data)
+#         insights = insight_gen.generate_insights(processed_data)
+        
+#         result = {
+#             "company_info": {
+#                 "title": processed_data.get("title"),
+#                 "industry": processed_data.get("industry_guess"),
+#                 "description": processed_data.get("description")
+#             },
+#             "sales_intelligence": insights
+#         }
+        
+#         db.save_report(result)
+#         if "_id" in result:
+#             del result["_id"]
+            
+#         return result
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import traceback
+
 from app.agents.scraper import DataCollectionAgent
 from app.agents.processor import DataProcessor
 from app.agents.insight_agent import InsightAgent
 from app.database import Database
 
-app = FastAPI()
+app = FastAPI(title="AI Sales Research Agent")
 
 app.add_middleware(
     CORSMiddleware,
@@ -133,26 +184,49 @@ db = Database()
 class AnalyzeRequest(BaseModel):
     url: str
 
+@app.get("/")
+def home():
+    return {"status": "active", "message": "Server is running"}
+
 @app.post("/analyze_company")
 async def analyze(request: AnalyzeRequest):
+    print(f"\n🚀 [NEW REQUEST] Starting analysis for: {request.url}")
+    
     try:
+        print("🔍 [STEP 1/4] Scraping website content...")
         raw_data = scraper.scrape(request.url)
+        print("✅ [STEP 1/4] Scraping successful.")
+        
+        print("⚙️ [STEP 2/4] Processing and cleaning data...")
         processed_data = processor.process(raw_data)
+        print("✅ [STEP 2/4] Data processing complete.")
+        
+        print("🤖 [STEP 3/4] Generating AI Insights via Gemini Pro...")
         insights = insight_gen.generate_insights(processed_data)
+        print("✅ [STEP 3/4] AI Insights generated.")
         
         result = {
             "company_info": {
-                "title": processed_data.get("title"),
-                "industry": processed_data.get("industry_guess"),
-                "description": processed_data.get("description")
+                "title": processed_data.get("title", "N/A"),
+                "industry": processed_data.get("industry_guess", "General"),
+                "description": processed_data.get("description", "")
             },
             "sales_intelligence": insights
         }
         
-        db.save_report(result)
-        if "_id" in result:
-            del result["_id"]
+        print("💾 [STEP 4/4] Saving report to MongoDB...")
+        try:
+            db.save_report(result)
+            if "_id" in result:
+                del result["_id"]
+            print("✅ [STEP 4/4] Report saved and ID cleaned.")
+        except Exception as db_err:
+            print(f"⚠️ [WARNING] Database save failed: {db_err}")
             
+        print(f"✨ [SUCCESS] Analysis complete for {request.url}\n")
         return result
+
     except Exception as e:
+        print(f"❌ [ERROR] Critical failure during analysis!")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
