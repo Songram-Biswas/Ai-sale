@@ -70,7 +70,53 @@
 #             "meta": {"reason": reason},
 #         }
 
-import openai
+# import openai
+# import json
+# import logging
+# from app.config import Config
+
+# logger = logging.getLogger(__name__)
+
+# class InsightAgent:
+#     def __init__(self):
+#         self.client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
+
+#     def generate_insights(self, processed_data: dict):
+#         web_content = processed_data.get('cleaned_content', '')[:4000]
+#         company_url = processed_data.get('url', 'Unknown URL')
+        
+#         prompt = f"""
+#         Analyze the company website content from {company_url} and provide a structured sales report.
+#         Content: {web_content}
+        
+#         Return ONLY a valid JSON object with:
+#         1. "insights": A brief summary of what they do.
+#         2. "pain_points": A list of 3 potential challenges.
+#         3. "personalization_hooks": A list of 2 unique conversation starters.
+#         """
+
+#         try:
+#             response = self.client.chat.completions.create(
+#                 model="gpt-3.5-turbo",
+#                 messages=[
+#                     {"role": "system", "content": "You are a sales intelligence expert. Respond only in JSON."},
+#                     {"role": "user", "content": prompt}
+#                 ],
+#                 response_format={"type": "json_object"}
+#             )
+            
+#             return json.loads(response.choices[0].message.content)
+
+#         except Exception as e:
+#             logger.error(f"Error in OpenAI Agent: {str(e)}")
+#             return {
+#                 "insights": "AI analysis failed due to quota or connection issues.",
+#                 "pain_points": [f"Error: {str(e)[:50]}"],
+#                 "personalization_hooks": []
+#             }
+
+import google.generativeai as genai
+import google.generativeai as genai
 import json
 import logging
 from app.config import Config
@@ -79,7 +125,8 @@ logger = logging.getLogger(__name__)
 
 class InsightAgent:
     def __init__(self):
-        self.client = openai.OpenAI(api_key=Config.OPENAI_API_KEY)
+        genai.configure(api_key=Config.GEMINI_API_KEY)
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
 
     def generate_insights(self, processed_data: dict):
         web_content = processed_data.get('cleaned_content', '')[:4000]
@@ -96,21 +143,17 @@ class InsightAgent:
         """
 
         try:
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are a sales intelligence expert. Respond only in JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"}
+            response = self.model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    response_mime_type="application/json"
+                )
             )
-            
-            return json.loads(response.choices[0].message.content)
-
+            return json.loads(response.text)
         except Exception as e:
-            logger.error(f"Error in OpenAI Agent: {str(e)}")
+            logger.error(f"Error in Gemini Agent: {str(e)}")
             return {
-                "insights": "AI analysis failed due to quota or connection issues.",
-                "pain_points": [f"Error: {str(e)[:50]}"],
+                "insights": "Analysis failed.",
+                "pain_points": [str(e)[:50]],
                 "personalization_hooks": []
             }
